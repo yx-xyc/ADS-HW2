@@ -1,3 +1,8 @@
+CLAUDE.md
+
+# ignore generated data
+data/trade.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
