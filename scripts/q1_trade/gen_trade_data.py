@@ -25,7 +25,6 @@ def gen_fractal_symbols(frac, n):
     print(f"Generating symbol pool with N={n}, frac={frac}...")
     
     # p: random permutation of numbers from 1 to N
-    # We use "SYM" prefix to make them look like stock tickers
     p = [f"SYM{i}" for i in range(1, n + 1)]
     random.shuffle(p)
     
@@ -44,11 +43,11 @@ def gen_fractal_symbols(frac, n):
         # p: first frac*|p| elements of p
         current_p = current_p[:split_idx]
         
-        # prepend p to outvec (we add to the front)
+        # prepend p to outvec
         outvec = current_p + outvec
         
     print(f"Final symbol pool size: {len(outvec)}")
-    return outvec
+    return random.shuffle(outvec)
 
 def generate_trades():
     # 1. Generate the pool of symbols (Fractal Distribution)
@@ -68,21 +67,18 @@ def generate_trades():
 
     with open(OUTPUT_FILE, 'w', newline='') as f:
         writer = csv.writer(f)
-        # Header (Optional, usually DBs like COPY without header or with HEADER option)
-        # We will omit header to strictly match the data example if needed, 
-        # but adding it makes loading safer. Let's add it.
+
         writer.writerow(['stocksymbol', 'time', 'quantity', 'price'])
 
         for t in range(1, NUM_TRADES + 1):
             # Choose symbol uniformly from the fractal pool
-            # (This effectively implements the fractal distribution for trades)
             sym = symbol_pool[random.randint(0, pool_size - 1)]
             
             # Get last price
             last_price = current_prices[sym]
             
             # Calculate new price
-            # "vary by at least 1 but no more than 5" [cite: 6972]
+            # vary by at least 1 but no more than 5
             delta = random.randint(PRICE_DELTA_MIN, PRICE_DELTA_MAX)
             
             # Randomly decide up or down
@@ -91,7 +87,7 @@ def generate_trades():
             
             new_price = last_price + delta
             
-            # "should still stay within that interval" (50-500) [cite: 6972]
+            # should still stay within that interval [50-500]
             if new_price < MIN_PRICE:
                 new_price = MIN_PRICE + abs(delta) # Bounce back up
             elif new_price > MAX_PRICE:
