@@ -4,13 +4,10 @@ import duckdb
 import os
 
 # --- CONFIGURATION ---
-# Your specific Postgres connection from the screenshot
 PG_DSN = "dbname=hw2 user=yx2021 host=/home/yx2021/pgsql/data/run port=10000"
 
-# Use a separate file for tuning to avoid locking your main hw2.duckdb
 DUCK_DB_FILE = os.path.expanduser("~/duckdb_databases/hw2_sec2_tuning.duckdb")
 
-# Scenarios
 ROWS_STRONG = 50000   # Large load: Batching should win significantly
 ROWS_WEAK = 50        # Tiny load: Batching overhead might make it slower/equal
 
