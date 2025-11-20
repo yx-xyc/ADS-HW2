@@ -52,7 +52,7 @@ def run_loading_test(system, method, row_count):
         if method == "row":
             for row in data:
                 cur.execute("INSERT INTO load_test VALUES (%s, %s)", row)
-            conn.commit() # Commit every row (simulating bad application logic)
+                conn.commit() # Commit every row (simulating bad application logic)
         elif method == "batch":
             cur.executemany("INSERT INTO load_test VALUES (%s, %s)", data)
             conn.commit() # Commit once at the end
