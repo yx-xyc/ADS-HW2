@@ -31,12 +31,12 @@ def run_social_challenge():
         DROP TABLE IF EXISTS friends CASCADE;
     """)
 
-    # Create Input Tables (UNLOGGED for speed)
+    # Create Input Tables
     print("--- Loading Raw Data ---")
     cur.execute("""
-        CREATE UNLOGGED TABLE likes (person INT, artist INT);
-        CREATE UNLOGGED TABLE dislikes (person INT, artist INT);
-        CREATE UNLOGGED TABLE friends_raw (p1 INT, p2 INT);
+        CREATE TABLE likes (person INT, artist INT);
+        CREATE TABLE dislikes (person INT, artist INT);
+        CREATE TABLE friends_raw (p1 INT, p2 INT);
     """)
 
     # Load Data
@@ -56,7 +56,7 @@ def run_social_challenge():
     
     # Symmetrize friends
     cur.execute("""
-        CREATE UNLOGGED TABLE friends AS 
+        CREATE TABLE friends AS 
         SELECT p1, p2 FROM friends_raw
         UNION ALL
         SELECT p2 as p1, p1 as p2 FROM friends_raw
@@ -74,7 +74,7 @@ def run_social_challenge():
     
     # (i) MyFriendLikes
     cur.execute("""
-        CREATE UNLOGGED TABLE MyFriendLikes AS
+        CREATE TABLE MyFriendLikes AS
         SELECT DISTINCT f.p1 as u1, f.p2 as u2, l.artist
         FROM friends f
         JOIN likes l ON f.p2 = l.person
@@ -88,7 +88,7 @@ def run_social_challenge():
 
     # (ii) MyFriendDislikes
     cur.execute("""
-        CREATE UNLOGGED TABLE MyFriendDislikes AS
+        CREATE TABLE MyFriendDislikes AS
         SELECT DISTINCT f.p1 as u1, f.p2 as u2, d.artist
         FROM friends f
         JOIN dislikes d ON f.p2 = d.person
@@ -102,7 +102,7 @@ def run_social_challenge():
 
     # (iii) IShouldLike
     cur.execute("""
-        CREATE UNLOGGED TABLE IShouldLike AS
+        CREATE TABLE IShouldLike AS
         SELECT mfl.u1, mfl.artist
         FROM MyFriendLikes mfl
         LEFT JOIN MyFriendDislikes mfd 
