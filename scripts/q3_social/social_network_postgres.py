@@ -3,7 +3,6 @@ import time
 import os
 
 # --- CONFIGURATION ---
-# Using your working connection string from Phase 2
 PG_DSN = "dbname=hw2 user=yx2021 host=/home/yx2021/pgsql/data/run port=10000"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "../../data")
@@ -21,7 +20,6 @@ def run_social_challenge():
     start_total = time.time()
 
     # 1. CLEANUP & SETUP
-    # We drop ALL tables (inputs and outputs) to ensure a clean run every time.
     print("--- Cleaning up previous tables ---")
     cur.execute("""
         DROP TABLE IF EXISTS MyFriendLikes CASCADE;
@@ -33,8 +31,7 @@ def run_social_challenge():
         DROP TABLE IF EXISTS friends CASCADE;
     """)
 
-    # Create Input Tables
-    # We use UNLOGGED tables to speed up writing (durability doesn't matter for temp results)
+    # Create Input Tables (UNLOGGED for speed)
     print("--- Loading Raw Data ---")
     cur.execute("""
         CREATE UNLOGGED TABLE likes (person INT, artist INT);
@@ -42,25 +39,22 @@ def run_social_challenge():
         CREATE UNLOGGED TABLE friends_raw (p1 INT, p2 INT);
     """)
 
-    # Load using \COPY equivalent (copy_expert)
+    # Load Data
     try:
         with open(os.path.join(DATA_DIR, 'like.txt'), 'r') as f:
             cur.copy_expert("COPY likes FROM STDIN WITH (FORMAT CSV, HEADER TRUE)", f)
-        
         with open(os.path.join(DATA_DIR, 'dislike.txt'), 'r') as f:
             cur.copy_expert("COPY dislikes FROM STDIN WITH (FORMAT CSV, HEADER TRUE)", f)
-            
         with open(os.path.join(DATA_DIR, 'friends.txt'), 'r') as f:
             cur.copy_expert("COPY friends_raw FROM STDIN WITH (FORMAT CSV, HEADER TRUE)", f)
     except FileNotFoundError as e:
         print(f"Error: Could not find data file. {e}")
         return
 
-    # 2. Symmetrize Friends & Indexing
-    # The prompt counts index creation time, so we time this carefully.
-    print("--- Optimizing & Indexing (Crucial for Join Speed) ---")
+    # 2. OPTIMIZATION & INDEXING
+    print("--- Optimizing & Indexing ---")
     
-    # Materialize symmetric friends: p1->p2 AND p2->p1
+    # Symmetrize friends
     cur.execute("""
         CREATE UNLOGGED TABLE friends AS 
         SELECT p1, p2 FROM friends_raw
@@ -68,20 +62,17 @@ def run_social_challenge():
         SELECT p2 as p1, p1 as p2 FROM friends_raw
     """)
     
-    # CREATE INDEXES: This is the "Tuning" part that makes Postgres fast.
-    # We need indexes on join columns to avoid sequential scans.
+    # Create Indexes (Removed the redundant artist index as suggested)
     cur.execute("CREATE INDEX idx_friends_p1 ON friends(p1, p2)")
     cur.execute("CREATE INDEX idx_likes_person ON likes(person, artist)")
     cur.execute("CREATE INDEX idx_dislikes_person ON dislikes(person, artist)")
-    # Indexes for the inverse lookups in NOT EXISTS clauses
-    cur.execute("CREATE INDEX idx_likes_artist ON likes(artist)") 
     
-    print(f"Setup & Indexing Complete. Time so far: {time.time() - start_total:.2f}s")
+    print(f"Setup Complete. Time so far: {time.time() - start_total:.2f}s")
 
-    # 3. Execute Logic
+    # 3. EXECUTE LOGIC
     print("--- Executing Analysis Queries ---")
     
-    # (i) MyFriendLikes: Friend u2 likes 'a', u1 does not
+    # (i) MyFriendLikes
     cur.execute("""
         CREATE UNLOGGED TABLE MyFriendLikes AS
         SELECT DISTINCT f.p1 as u1, f.p2 as u2, l.artist
@@ -95,7 +86,7 @@ def run_social_challenge():
         )
     """)
 
-    # (ii) MyFriendDislikes: Friend u2 dislikes 'a', u1 does not
+    # (ii) MyFriendDislikes
     cur.execute("""
         CREATE UNLOGGED TABLE MyFriendDislikes AS
         SELECT DISTINCT f.p1 as u1, f.p2 as u2, d.artist
@@ -109,7 +100,7 @@ def run_social_challenge():
         )
     """)
 
-    # (iii) IShouldLike: Recommendation (Friend likes, NO friend dislikes)
+    # (iii) IShouldLike
     cur.execute("""
         CREATE UNLOGGED TABLE IShouldLike AS
         SELECT mfl.u1, mfl.artist
@@ -124,18 +115,34 @@ def run_social_challenge():
     total_duration = end_total - start_total
     
     print(f"--- FINISHED ---")
-    print(f"Total Execution Time (Load + Index + Query): {total_duration:.4f}s")
-    
-    if total_duration > 120:
-        print("WARNING: Over 2 minute limit!")
-    else:
-        print("SUCCESS: Under 2 minute limit.")
+    print(f"Total Execution Time: {total_duration:.4f}s")
 
-    # 4. Verify Output
-    print("\nSample Output (IShouldLike):")
+    # 4. VERIFICATION & OUTPUT
+    print("\n--- Results Verification ---")
+
+    # Count and Sample: MyFriendLikes
+    cur.execute("SELECT COUNT(*) FROM MyFriendLikes")
+    count = cur.fetchone()[0]
+    print(f"\n[MyFriendLikes] Total Rows: {count}")
+    print("Sample (u1, u2, artist):")
+    cur.execute("SELECT * FROM MyFriendLikes ORDER BY u1, artist LIMIT 5")
+    for row in cur.fetchall(): print(row)
+
+    # Count and Sample: MyFriendDislikes
+    cur.execute("SELECT COUNT(*) FROM MyFriendDislikes")
+    count = cur.fetchone()[0]
+    print(f"\n[MyFriendDislikes] Total Rows: {count}")
+    print("Sample (u1, u2, artist):")
+    cur.execute("SELECT * FROM MyFriendDislikes ORDER BY u1, artist LIMIT 5")
+    for row in cur.fetchall(): print(row)
+
+    # Count and Sample: IShouldLike
+    cur.execute("SELECT COUNT(*) FROM IShouldLike")
+    count = cur.fetchone()[0]
+    print(f"\n[IShouldLike] Total Rows: {count}")
+    print("Sample (u1, artist):")
     cur.execute("SELECT * FROM IShouldLike ORDER BY u1, artist LIMIT 5")
-    for row in cur.fetchall():
-        print(row)
+    for row in cur.fetchall(): print(row)
 
     cur.close()
     conn.close()
