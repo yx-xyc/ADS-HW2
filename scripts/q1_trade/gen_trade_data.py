@@ -47,7 +47,8 @@ def gen_fractal_symbols(frac, n):
         outvec = current_p + outvec
         
     print(f"Final symbol pool size: {len(outvec)}")
-    return random.shuffle(outvec)
+    random.shuffle(outvec)
+    return outvec
 
 def generate_trades():
     # 1. Generate the pool of symbols (Fractal Distribution)
